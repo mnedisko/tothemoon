@@ -1,72 +1,85 @@
-from ultralytics import YOLO
-import time
 import cv2
 import numpy as np
-model = YOLO('fullmoondetectmodel.pt')
-midx = 0
-midy = 0
-cls_model = YOLO('runs/classify/train11/weights/best.pt')
-#results = model('moon2.mp4',show=True)
+from ultralytics import YOLO
 
-moon = cv2.imread('img/ay.png')
-alpha = np.ones((moon.shape[0], moon.shape[1]), dtype=np.uint8) * 255
-moon = cv2.merge((moon, alpha))
-#def is_zoomed(frame, midx, midy, moon):
-#    overlay_img = np.ones(frame.shape,np.uint8) * 255
-#    rows, cols, _ = frame.shape
-#    moon_rows, moon_cols, _ = moon.shape
-#    overlay_img[int(midx - moon_rows/2):int(midx - moon_rows/2) + moon_rows, 
-#                int(midy - moon_cols/2):int(midy - moon_cols/2) + moon_cols] = moon
-#    moongray = cv2.cvtColor(overlay_img, cv2.COLOR_BGR2GRAY)
-#    ret, mask = cv2.threshold(moongray, 10, 255, cv2.THRESH_BINARY)
-#    mask_inv = cv2.bitwise_not(mask)
-#    moon_fg = cv2.bitwise_and(frame, frame, mask=mask_inv)
-#    frame_bg = cv2.bitwise_and(overlay_img, overlay_img, mask=mask)
-#    dst = cv2.add(moon_fg, frame_bg)
-#    return dst
-def is_zoomed(frame, midx, midy, moon):
-    rows, cols, _ = moon.shape
-    x1 = int(midx - cols / 2)
-    y1 = int(midy - rows / 2)
-    x2 = x1 + cols
-    y2 = y1 + rows
+settings={"moon_path":"/home/oem/İndirilenler/fullmoon.png",
+          "video_path":"moon2.mp4",
+          "model_path":"fullmoondetectmodel.pt",
+          "cls_model_path":"runs/classify/train11/weights/last.pt",
+          "video_saving":True}
 
-    # Arka plan görüntüsünü ve üst üste binen görüntüyü alfa kanalıyla birleştirme
-    for y in range(y1, y2):
-        for x in range(x1, x2):
-            if x < 0 or y < 0 or x >= frame.shape[1] or y >= frame.shape[0]:
-                continue  # Arka plan sınırlarını aşarsa devam et
-            alpha_moon = moon[y - y1, x - x1, 3] / 255.0  # Alfa kanalını al
-            alpha_frame = 1.0 - alpha_moon  # Arka plan alfa kanalı
+overlay = cv2.imread(settings["moon_path"], cv2.IMREAD_UNCHANGED)
+overlay=cv2.resize(overlay,(100,100))  # IMREAD_UNCHANGED => open image with the alpha channel
+alpha = np.ones((overlay.shape[0], overlay.shape[1]), dtype=np.uint8) * 255
+overlay = cv2.merge((overlay, alpha))
 
-            # Alfa kanalı ile ağırlıklandırılmış renkleri birleştirme
-            for c in range(0, 3):
-                frame[y, x, c] = (alpha_moon * moon[y - y1, x - x1, c] +
-                                  alpha_frame * frame[y, x, c])
+def resize_moon(overlay):
+    """
+    Resize the overlay image to match the size of the bounding box.
+
+    Args:
+        overlay (numpy.ndarray): The overlay image.
+
+    Returns:
+        numpy.ndarray: The resized overlay image.
+    """
+    overlay_height, overlay_width = overlay.shape[:2]
+    width_ratio = bbox_width / overlay_width
+    height_ratio = bbox_height / overlay_height
+    overlay = cv2.resize(overlay, (int(overlay_width * width_ratio), int(overlay_height * height_ratio)))
+    return overlay
+
+def get_alpha(overlay, midx, midy, frame):
+    """
+    Apply alpha blending to overlay the resized moon image onto the frame.
+
+    Args:
+        overlay (numpy.ndarray): The resized moon image with alpha channel.
+        midx (float): The x-coordinate of the midpoint of the bounding box.
+        midy (float): The y-coordinate of the midpoint of the bounding box.
+        frame (numpy.ndarray): The frame to overlay the moon image on.
+
+    Returns:
+        numpy.ndarray: The frame with the moon image overlaid.
+    """
+    overlay=resize_moon(overlay)
+    alpha_channel = overlay[:, :, 3] / 255
+    overlay_colors = overlay[:, :, :3]
+    alpha_mask = np.dstack((alpha_channel, alpha_channel, alpha_channel))
+    h, w = overlay.shape[:2]
+    x1 = int(midx - w / 2)
+    y1 = int(midy - h / 2)
+    x2 = x1 + w
+    y2 = y1 + h
+    x1_frame, y1_frame = max(0, x1), max(0, y1)
+    x2_frame, y2_frame = min(frame.shape[1], x2), min(frame.shape[0], y2)
+    moon_x1 = x1_frame - x1
+    moon_x2 = moon_x1 + (x2_frame - x1_frame)
+    moon_y1 = y1_frame - y1
+    moon_y2 = moon_y1 + (y2_frame - y1_frame)
+
+    background_subsection = frame[y1_frame:y2_frame, x1_frame:x2_frame]
+    composite = background_subsection * (1 - alpha_mask[moon_y1:moon_y2, moon_x1:moon_x2]) + overlay_colors[moon_y1:moon_y2, moon_x1:moon_x2] * alpha_mask[moon_y1:moon_y2, moon_x1:moon_x2]
+    frame[y1_frame:y2_frame, x1_frame:x2_frame] = composite
+
     return frame
 
+cap = cv2.VideoCapture(settings["video_path"])
+if settings["video_saving"]:
+    out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'XVID'), 30, (int(cap.get(3)), int(cap.get(4))))
+model = YOLO(settings["model_path"])
+cls_model = YOLO(settings["cls_model_path"])
 
-#def is_zoomed(frame,midx,midy):
-#    overlay_img = np.ones((frame.shape), np.uint8) * 255
-#    overlay_img[int(midx):rows+int(midx), int(midy):cols+int(midy)] = moon
-#    moongray = cv2.cvtColor(overlay_img, cv2.COLOR_BGR2GRAY)
-#    ret, mask = cv2.threshold(moongray, 10, 255, cv2.THRESH_BINARY)
-#    mask_inv = cv2.bitwise_not(mask)
-#    moon_fg = cv2.bitwise_and(frame, frame, mask=mask_inv)
-#    frame_bg = cv2.bitwise_and(overlay_img, overlay_img, mask=mask)
-#    dst = cv2.add(moon_fg,frame_bg)
-#    frame[int(midx):rows+int(midx), int(midy):cols+int(midy)] = moon
-#    return frame
-cap = cv2.VideoCapture('/home/oem/output.mp4')
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
         break
-    frame_cpy = frame.copy()
-    results = model(frame)
-    cls_results = cls_model(frame)
+    frame_Cpy= frame.copy()
+    results = model(frame, show=False,verbose=False)
+    cls_results = cls_model(frame, show=False,verbose=False)
     for boxes in results[0].boxes.cpu().numpy():
         x1, y1, x2, y2= boxes.xyxy[0]
+        bbox_x, bbox_y, bbox_width, bbox_height = x1, y1, x2-x1, y2-y1
         cls = boxes.cls[0]
         conf = boxes.conf[0]
         mid_point = (x1+x2)/2, (y1+y2)/2
@@ -74,23 +87,22 @@ while cap.isOpened():
         midy = mid_point[1]
         cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
         cv2.putText(frame, f'{model.names[int(cls)]} {conf:.2f}', (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        cv2.circle(frame, (int((x1+x2)/2), int((y1+y2)/2)), 5, (0, 255, 0), -1)
-
+        frame = get_alpha(overlay,midx,midy, frame_Cpy)
     for result in cls_results:
         name = result.probs.top1
         if name == 0:
             name = 'no_zoom'
         else:
             name = 'zoom'
-            frame = is_zoomed(frame_cpy, midx, midy, moon)
         cls = result.probs.top1conf
         cv2.putText(frame, f'{name} {cls:.2f}', (15, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
-
     cv2.imshow('frame', frame)
-
+    if settings["video_saving"]:
+        out.write(frame)
     if cv2.waitKey(30) & 0xFF == ord('q'):
         break
+if settings["video_saving"]:
+    out.release()
 
 cap.release()
 cv2.destroyAllWindows()
