@@ -1,23 +1,61 @@
-Adding Moon Image Around Detected Objects with Object Detection and Classification
+# 🌕 To The Moon
 
+This is a fun little computer vision project that detects objects in a video stream and adds a moon image around each of them. Inspired by the idea of making even the most ordinary scenes feel a bit more cosmic 🌌
 
-This project aims to detect objects on a video stream using object detection and classification models, and then add a moon image around the detected objects.
+## 🚀 Getting Started
 
-Installation
-To run the project, follow these steps:
+Make sure you have Python 3.6+ installed.
 
-Install Python 3.6 or above.
-Install the required Python libraries by running the following command:
+Then install the required dependencies:
+
+```bash
 pip install opencv-python numpy torch torchvision ultralytics
-Usage
-When the project is launched, a video stream will be opened, and objects will be detected using object detection and classification models. For each detected object, a moon image will be added around it, and classification results will be displayed on the screen. Additionally, the output video file will be saved as 'output.mp4'.
+```
 
-To run the project, execute the following command in the terminal:
+## 🎬 How to Use
+
+Just run:
+
+```bash
 python main.py
-A window with the video stream will open, and the processing will begin. Press 'q' on the keyboard to exit.
+```
 
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
+* It will open your camera or video stream.
+* Detected objects will be surrounded by a moon image.
+* Press `q` to quit.
+* The output video will be saved as `output.mp4`.
 
-Contributing
-If you would like to contribute, please open an issue or submit a pull request. Contributions are welcome!
+## ✨ Example Outputs
+
+Here’s what the project looks like in action:
+
+![Sample 1](img/original.gif) <!-- MARK: GIF 1 -->
+
+![Sample 2](img/output.gif) <!-- MARK: GIF 2 -->
+
+## 📁 Project Structure
+
+```
+├── main.py              # Main script
+├── crop.py              # Cropping logic
+├── laber.py             # Label-related logic
+├── fullmoondetectmodel.pt  # The detection model
+└── img/
+    ├── moon.png         # Moon overlay image
+    ├── sample1.gif
+    └── sample2.gif
+```
+
+## 📌 Notes
+
+* The detection model is YOLO-based.
+* Moon position is calculated based on the bounding box of detected objects.
+* Can be easily adapted to use different overlays (e.g. sun, stars, etc.).
+
+## 📝 License
+
+MIT — do whatever you want, just don't forget to have fun 🌝
+
+---
+
+If you liked this, feel free to fork it or drop a 🌟
